@@ -1,0 +1,57 @@
+name: Fejezetek lapozógombjai
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lapozógombok beillesztése
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          for i in range(1, 29):
+              file = Path(f"{i:02d}-fejezet.html")
+              if not file.exists():
+                  raise FileNotFoundError(file)
+
+              text = file.read_text(encoding="utf-8")
+              nxt = f"{i+1:02d}-fejezet.html" if i < 28 else "epilogus.html"
+
+              if f'href="{nxt}"' in text:
+                  continue
+
+              button = (
+                  '<p style="text-align:center; text-indent:0; margin-top:2em;">'
+                  f'<a href="{nxt}">Következő fejezet →</a>'
+                  '</p>\n'
+              )
+
+              text, count = re.subn(
+                  r'</main>',
+                  button + '</main>',
+                  text,
+                  count=1,
+                  flags=re.IGNORECASE
+              )
+
+              if count == 0:
+                  raise ValueError(f"Nem található </main>: {file}")
+
+              file.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Módosítások mentése
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- *-fejezet.html
+          git diff --cached --quiet || (git commit -m "Fejezet lapozógombok hozzáadása" && git push)
